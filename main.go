@@ -137,7 +137,7 @@ func fetchArchive(ctx context.Context, uri string) (io.ReadCloser, error) {
 			return rc, nil
 		}
 	}
-	return nil, nil
+	return nil, fmt.Errorf("asset '%s' not found", uri)
 }
 
 func switchProtocolToGithub(file helm.IndexFile) helm.IndexFile {
