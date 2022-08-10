@@ -45,7 +45,7 @@ jobs:
         fi
         cp plugin.yaml dist/
         tar -czvf helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz -C dist/ .
-        sha256sum "helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" | awk '{ print $1 }' >> helm-github_${VERSION}_checksums.txt
+        sha256sum "helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" | awk '{ print $1 }' > helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}_checksum.txt
     - name: Release
       uses: wandera/action-gh-release@v1
       with:
