@@ -53,16 +53,16 @@ checksum_url="https://github.com/wandera/helm-github/releases/download/v${versio
 mkdir -p "bin"
 mkdir -p "releases/v${version}"
 binary_filename="releases/v${version}.tar.gz"
-checksums_filename="releases/v${version}_checksums.txt"
+checksum_filename="releases/v${version}_checksum.txt"
 
 # Download binary and checksums files.
 (
   if command -v curl >/dev/null 2>&1; then
     curl -sSL "${binary_url}" -o "${binary_filename}"
-    curl -sSL "${checksum_url}" -o "${checksums_filename}"
+    curl -sSL "${checksum_url}" -o "${checksum_filename}"
   elif command -v wget >/dev/null 2>&1; then
     wget -q "${binary_url}" -O "${binary_filename}"
-    wget -q "${checksum_url}" -O "${checksums_filename}"
+    wget -q "${checksum_url}" -O "${checksum_filename}"
   else
     echo "ERROR: no curl or wget found to download files." >/dev/stderr
   fi
@@ -72,10 +72,10 @@ checksums_filename="releases/v${version}_checksums.txt"
 (
   if command -v sha256sum >/dev/null 2>&1; then
     checksum=$(sha256sum "${binary_filename}" | awk '{ print $1 }')
-    validate_checksum "${checksum}" "${checksums_filename}"
+    validate_checksum "${checksum}" "${checksum_filename}"
   elif command -v openssl >/dev/null 2>&1; then
     checksum=$(openssl dgst -sha256 "${binary_filename}" | awk '{ print $2 }')
-    validate_checksum "${checksum}" "${checksums_filename}"
+    validate_checksum "${checksum}" "${checksum_filename}"
   else
     echo "WARNING: no tool found to verify checksum" >/dev/stderr
   fi
@@ -83,5 +83,5 @@ checksums_filename="releases/v${version}_checksums.txt"
 
 # Unpack the binary.
 tar xzf "${binary_filename}" -C "releases/v${version}"
-mv "releases/v${version}/bin/helms3" "bin/helms3"
+mv "releases/v${version}/bin/helmgithub" "bin/helmgithub"
 exit 0
