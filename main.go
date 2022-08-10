@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/v45/github"
+	"github.com/wandera/helm-github/helm"
 	"golang.org/x/oauth2"
-	"helm.sh/helm/v3/pkg/repo"
 	"sigs.k8s.io/yaml"
 )
 
@@ -103,20 +103,20 @@ func getIndexBranch() string {
 	return "gh-pages"
 }
 
-func fetchIndexFile(ctx context.Context, uri string) (repo.IndexFile, error) {
+func fetchIndexFile(ctx context.Context, uri string) (helm.IndexFile, error) {
 	owner, repository := parseOwnerRepository(uri)
 	contents, _, _, err := client.Repositories.GetContents(ctx, owner, repository, indexFilename, &github.RepositoryContentGetOptions{Ref: getIndexBranch()})
 	if err != nil {
-		return repo.IndexFile{}, err
+		return helm.IndexFile{}, err
 	}
 	decoded, err := contents.GetContent()
 	if err != nil {
-		return repo.IndexFile{}, err
+		return helm.IndexFile{}, err
 	}
-	file := repo.IndexFile{}
+	file := helm.IndexFile{}
 	err = yaml.UnmarshalStrict([]byte(decoded), &file)
 	if err != nil {
-		return repo.IndexFile{}, err
+		return helm.IndexFile{}, err
 	}
 	return file, nil
 }
@@ -140,9 +140,9 @@ func fetchArchive(ctx context.Context, uri string) (io.ReadCloser, error) {
 	return nil, nil
 }
 
-func switchProtocolToGithub(file repo.IndexFile) repo.IndexFile {
+func switchProtocolToGithub(file helm.IndexFile) helm.IndexFile {
 	for name, versions := range file.Entries {
-		file.Entries[name] = mapFunc(versions, func(chart *repo.ChartVersion) *repo.ChartVersion {
+		file.Entries[name] = mapFunc(versions, func(chart helm.ChartVersion) helm.ChartVersion {
 			chart.URLs = mapFunc(chart.URLs, mapGithubURL)
 			return chart
 		})
