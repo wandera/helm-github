@@ -48,7 +48,7 @@ CYGWIN* | MINGW* | MSYS_NT*) os="windows" ;;
 esac
 
 binary_url="https://github.com/wandera/helm-github/releases/download/v${version}/helm-github_${version}_${os}_${arch}.tar.gz"
-checksum_url="https://github.com/wandera/helm-github/releases/download/v${version}/helm-github_${version}_checksums.txt"
+checksum_url="https://github.com/wandera/helm-github/releases/download/v${version}/helm-github_${version}_${os}_${arch}_checksum.txt"
 
 mkdir -p "bin"
 mkdir -p "releases/v${version}"
