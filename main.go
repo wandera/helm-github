@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -23,9 +24,20 @@ const (
 	indexFilename = "index.yaml"
 )
 
-var client *github.Client
+var (
+	client         *github.Client
+	cacheDirBase   string
+	chartsCacheDir string
+)
 
 func init() {
+	if env, ok := os.LookupEnv("HELMGITHUB_DEBUG_LOG"); ok {
+		t, err := os.OpenFile(env, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Panic(err)
+		}
+		log.SetOutput(t)
+	}
 	token, err := loadGithubToken()
 	if err != nil {
 		log.Panic(err)
@@ -35,18 +47,11 @@ func init() {
 	)
 	tc := oauth2.NewClient(context.Background(), ts)
 	client = github.NewClient(tc)
+	cacheDirBase = getCacheDirBase()
+	chartsCacheDir = getChartCacheDir()
 }
 
 func main() {
-	if env, ok := os.LookupEnv("HELMGITHUB_DEBUG_LOG"); ok {
-		t, err := os.OpenFile(env, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			log.Panic(err)
-		}
-		defer t.Close()
-		log.SetOutput(t)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -65,17 +70,62 @@ func main() {
 			}
 			fmt.Println(string(bytes))
 		} else {
-			rc, err := fetchArchive(ctx, uri)
+			cacheFile, err := openCacheFile(uri)
 			if err != nil {
 				log.Panic(err)
 			}
-			defer rc.Close()
-			_, err = io.Copy(os.Stdout, rc)
-			if err != nil {
-				log.Panic(err)
+			defer cacheFile.Close()
+			ok := validateDigest(getArchiveDigest(uri), cacheFile.Name())
+			if !ok {
+				resp, err := fetchArchive(ctx, uri)
+				if err != nil {
+					_ = os.Remove(cacheFile.Name())
+					log.Panic(err)
+				}
+				defer resp.Close()
+				_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
+				if err != nil {
+					_ = os.Remove(cacheFile.Name())
+					log.Panic(err)
+				}
+			} else {
+				_, err := io.Copy(os.Stdout, cacheFile)
+				if err != nil {
+					log.Panic(err)
+				}
 			}
 		}
 	}
+}
+
+func getArchiveDigest(uri string) string {
+	_, r := parseOwnerRepository(uri)
+	bytes, err := os.ReadFile(path.Join(cacheDirBase, r+"-index.yaml"))
+	if err != nil {
+		return ""
+	}
+	idx := helm.IndexFile{}
+	if err := yaml.Unmarshal(bytes, &idx); err != nil {
+		return ""
+	}
+	for _, versions := range idx.Entries {
+		for _, version := range versions {
+			for _, u := range version.URLs {
+				if strings.HasSuffix(u, uri) {
+					return version.Digest
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func validateDigest(digest string, fileName string) bool {
+	df, err := helm.DigestFile(fileName)
+	if err != nil {
+		log.Panic(err)
+	}
+	return digest == df
 }
 
 func loadGithubToken() (string, error) {
@@ -103,6 +153,29 @@ func getIndexBranch() string {
 	return "gh-pages"
 }
 
+func getChartCacheDir() string {
+	dir := getCacheDirBase()
+	dir = path.Join(dir, "github", "chart")
+	if err := os.MkdirAll(dir, 0o777); err != nil {
+		log.Panic(err)
+	}
+	return dir
+}
+
+func getCacheDirBase() string {
+	var dir string
+	if env, ok := os.LookupEnv("HELM_REPOSITORY_CACHE"); ok {
+		dir = env
+	} else {
+		ucd, err := os.UserCacheDir()
+		if err != nil {
+			log.Panic(err)
+		}
+		dir = ucd
+	}
+	return dir
+}
+
 func fetchIndexFile(ctx context.Context, uri string) (helm.IndexFile, error) {
 	owner, repository := parseOwnerRepository(uri)
 	contents, _, _, err := client.Repositories.GetContents(ctx, owner, repository, indexFilename, &github.RepositoryContentGetOptions{Ref: getIndexBranch()})
@@ -119,6 +192,24 @@ func fetchIndexFile(ctx context.Context, uri string) (helm.IndexFile, error) {
 		return helm.IndexFile{}, err
 	}
 	return file, nil
+}
+
+func openCacheFile(uri string) (*os.File, error) {
+	artifactName := parseArtifactName(uri)
+	chartPath := path.Join(chartsCacheDir, artifactName+".tgz")
+	_, err := os.Stat(chartPath)
+	if err != nil {
+		create, err := os.Create(chartPath)
+		if err != nil {
+			return nil, err
+		}
+		return create, nil
+	}
+	open, err := os.Open(chartPath)
+	if err != nil {
+		return nil, err
+	}
+	return open, nil
 }
 
 func fetchArchive(ctx context.Context, uri string) (io.ReadCloser, error) {
