@@ -24,9 +24,11 @@ const (
 	indexFilename = "index.yaml"
 )
 
-var client *github.Client
-var cacheDirBase string
-var chartsCacheDir string
+var (
+	client         *github.Client
+	cacheDirBase   string
+	chartsCacheDir string
+)
 
 func init() {
 	if env, ok := os.LookupEnv("HELMGITHUB_DEBUG_LOG"); ok {
