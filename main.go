@@ -64,7 +64,7 @@ func main() {
 			file, ok := getCachedIndexFile(uri)
 			if ok && file.Annotations != nil {
 				parsed, err := time.Parse(time.RFC3339, file.Annotations[annotationDownloaded])
-				if err == nil && time.Now().Sub(parsed) < indexCacheDuration {
+				if err == nil && time.Since(parsed) < indexCacheDuration {
 					bytes, err := yaml.Marshal(&file)
 					if err != nil {
 						log.Panic(err)
