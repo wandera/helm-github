@@ -19,9 +19,12 @@ import (
 )
 
 const (
-	protocol      = "github"
-	githubHost    = "github.com"
-	indexFilename = "index.yaml"
+	protocol             = "github"
+	githubHost           = "github.com"
+	indexFilename        = "index.yaml"
+	annotationDownloaded = "wandera.com/helm-github/downloaded"
+	indexCacheDuration   = 60 * time.Second
+	timeout              = 30 * time.Second
 )
 
 var (
@@ -52,18 +55,34 @@ func init() {
 }
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	if len(os.Args) == 5 {
 		uri := strings.TrimPrefix(os.Args[4], protocol+"://")
 		if strings.HasSuffix(uri, indexFilename) {
+			file, ok := getCachedIndexFile(uri)
+			if ok && file.Annotations != nil {
+				parsed, err := time.Parse(time.RFC3339, file.Annotations[annotationDownloaded])
+				if err == nil && time.Since(parsed) < indexCacheDuration {
+					bytes, err := yaml.Marshal(&file)
+					if err != nil {
+						log.Panic(err)
+					}
+					fmt.Println(string(bytes))
+					return
+				}
+			}
 			file, err := fetchIndexFile(ctx, uri)
 			if err != nil {
 				log.Panic(err)
 			}
 			file = switchProtocolToGithub(file)
 			file.SortEntries()
+			if file.Annotations == nil {
+				file.Annotations = make(map[string]string)
+			}
+			file.Annotations[annotationDownloaded] = time.Now().Format(time.RFC3339)
 			bytes, err := yaml.Marshal(&file)
 			if err != nil {
 				log.Panic(err)
@@ -75,37 +94,31 @@ func main() {
 				log.Panic(err)
 			}
 			defer cacheFile.Close()
-			ok := validateDigest(getArchiveDigest(uri), cacheFile.Name())
-			if !ok {
-				resp, err := fetchArchive(ctx, uri)
-				if err != nil {
-					_ = os.Remove(cacheFile.Name())
-					log.Panic(err)
-				}
-				defer resp.Close()
-				_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
-				if err != nil {
-					_ = os.Remove(cacheFile.Name())
-					log.Panic(err)
-				}
-			} else {
+			if validateDigest(getArchiveDigest(uri), cacheFile.Name()) {
 				_, err := io.Copy(os.Stdout, cacheFile)
 				if err != nil {
 					log.Panic(err)
 				}
+				return
+			}
+			resp, err := fetchArchive(ctx, uri)
+			if err != nil {
+				_ = os.Remove(cacheFile.Name())
+				log.Panic(err)
+			}
+			defer resp.Close()
+			_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
+			if err != nil {
+				_ = os.Remove(cacheFile.Name())
+				log.Panic(err)
 			}
 		}
 	}
 }
 
 func getArchiveDigest(uri string) string {
-	_, r := parseOwnerRepository(uri)
-	bytes, err := os.ReadFile(path.Join(cacheDirBase, r+"-index.yaml"))
-	if err != nil {
-		return ""
-	}
-	idx := helm.IndexFile{}
-	if err := yaml.Unmarshal(bytes, &idx); err != nil {
+	idx, ok := getCachedIndexFile(uri)
+	if !ok {
 		return ""
 	}
 	for _, versions := range idx.Entries {
@@ -118,6 +131,19 @@ func getArchiveDigest(uri string) string {
 		}
 	}
 	return ""
+}
+
+func getCachedIndexFile(uri string) (helm.IndexFile, bool) {
+	_, r := parseOwnerRepository(uri)
+	bytes, err := os.ReadFile(path.Join(cacheDirBase, r+"-index.yaml"))
+	if err != nil {
+		return helm.IndexFile{}, false
+	}
+	idx := helm.IndexFile{}
+	if err := yaml.Unmarshal(bytes, &idx); err != nil {
+		return helm.IndexFile{}, false
+	}
+	return idx, true
 }
 
 func validateDigest(digest string, fileName string) bool {

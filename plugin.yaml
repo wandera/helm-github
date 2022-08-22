@@ -1,5 +1,5 @@
 name: "github"
-version: "0.1.1"
+version: "0.1.2"
 usage: "Manage chart repositories on Github"
 description: |-
   Provides Github Protocol Support
