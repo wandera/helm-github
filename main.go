@@ -99,18 +99,20 @@ func main() {
 				if err != nil {
 					log.Panic(err)
 				}
-				return
-			}
-			resp, err := fetchArchive(ctx, uri)
-			if err != nil {
-				_ = os.Remove(cacheFile.Name())
-				log.Panic(err)
-			}
-			defer resp.Close()
-			_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
-			if err != nil {
-				_ = os.Remove(cacheFile.Name())
-				log.Panic(err)
+			} else {
+				cacheFile.Truncate(0)
+				cacheFile.Seek(0, 0)
+				resp, err := fetchArchive(ctx, uri)
+				if err != nil {
+					_ = os.Remove(cacheFile.Name())
+					log.Panic(err)
+				}
+				defer resp.Close()
+				_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
+				if err != nil {
+					_ = os.Remove(cacheFile.Name())
+					log.Panic(err)
+				}
 			}
 		}
 	}
