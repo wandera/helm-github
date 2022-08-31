@@ -99,18 +99,20 @@ func main() {
 				if err != nil {
 					log.Panic(err)
 				}
-				return
-			}
-			resp, err := fetchArchive(ctx, uri)
-			if err != nil {
-				_ = os.Remove(cacheFile.Name())
-				log.Panic(err)
-			}
-			defer resp.Close()
-			_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
-			if err != nil {
-				_ = os.Remove(cacheFile.Name())
-				log.Panic(err)
+			} else {
+				cacheFile.Truncate(0)
+				cacheFile.Seek(0, 0)
+				resp, err := fetchArchive(ctx, uri)
+				if err != nil {
+					_ = os.Remove(cacheFile.Name())
+					log.Panic(err)
+				}
+				defer resp.Close()
+				_, err = io.Copy(io.MultiWriter(os.Stdout, cacheFile), resp)
+				if err != nil {
+					_ = os.Remove(cacheFile.Name())
+					log.Panic(err)
+				}
 			}
 		}
 	}
@@ -231,7 +233,7 @@ func openCacheFile(uri string) (*os.File, error) {
 		}
 		return create, nil
 	}
-	open, err := os.Open(chartPath)
+	open, err := os.OpenFile(chartPath, os.O_RDWR, 0o666)
 	if err != nil {
 		return nil, err
 	}
