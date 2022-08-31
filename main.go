@@ -231,7 +231,7 @@ func openCacheFile(uri string) (*os.File, error) {
 		}
 		return create, nil
 	}
-	open, err := os.Open(chartPath)
+	open, err := os.OpenFile(chartPath, os.O_RDWR, 0666)
 	if err != nil {
 		return nil, err
 	}
