@@ -3,7 +3,7 @@ module github.com/wandera/helm-github
 go 1.19
 
 require (
-	github.com/Masterminds/semver/v3 v3.2.0
+	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/google/go-github/v45 v45.2.0
 	golang.org/x/oauth2 v0.7.0
 	sigs.k8s.io/yaml v1.3.0
