@@ -37,7 +37,7 @@ jobs:
         tar -czvf helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz -C dist/ .
         sha256sum "helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz" | awk '{ print $1 }' > helm-github_${VERSION}_${{ matrix.goos }}_${{ matrix.goarch }}_checksum.txt
     - name: Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           *.tar.gz
