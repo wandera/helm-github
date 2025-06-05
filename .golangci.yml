@@ -1,27 +1,38 @@
-run:
-  timeout: 5m
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
-  - gosimple
+  - godot
+  - gosec
   - govet
   - ineffassign
   - staticcheck
-  - typecheck
+  - unparam
   - unused
-  - gofmt
-  - gci
-  - godot
-  - gofumpt
   - whitespace
-
-issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - ineffassign
-
+  exclusions:
+    generated: lax
+    presets:
+    - comments
+    - common-false-positives
+    - legacy
+    - std-error-handling
+    rules:
     - linters:
-        - staticcheck
-      text: "SA4006:" #SA4006: this value of `not_used` is never used (staticcheck)
+      - gosec
+      - ineffassign
+      path: _test\.go
+    paths:
+    - third_party$
+    - builtin$
+    - examples$
+formatters:
+  enable:
+  - gci
+  - gofumpt
+  exclusions:
+    generated: lax
+    paths:
+    - third_party$
+    - builtin$
+    - examples$
